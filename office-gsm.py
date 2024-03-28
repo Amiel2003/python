@@ -1,5 +1,7 @@
 import serial
 import time
+import json
+import requests
 
 # Configure serial port
 ser = serial.Serial(
@@ -17,6 +19,11 @@ print(response)  # Print response
 ser.write(b'AT+CMGF=1\r\n')  # Set SMS mode to text
 response = ser.read(100).decode('utf-8')  # Read response
 print(response)  # Print response
+
+def send_to_websocket(message_data):
+    url = "http://192.168.1.239:8765/receive_message"
+    headers = {'Content-Type': 'application/json'}
+    requests.post(url, data=json.dumps(message_data), headers=headers)
 
 # Infinite loop to continuously check for incoming messages
 while True:
@@ -41,5 +48,36 @@ while True:
             print("Sender:", sender)
             print("Date:", date)
             print("Content:", content)
+
+    if "+CMGL:" in response:
+        # Extracting message content
+        messages = response.split("+CMGL:")
+        for msg in messages[1:]:
+            parts = msg.split(",")
+            index = parts[0].strip()
+            sender = parts[2].strip().replace('"', '')
+            date = parts[4].strip().replace('"', '')
+            array = parts[5].split('"')
+            timeOfText = array[0]
+            contentStatus = array[1].split("\r\n\r\n")
+            content = contentStatus[0].replace('\r\n', '')
+
+            print("Message Index:", index)
+            print("Sender:", sender)
+            print("Date:", date)
+            print("Time: ", timeOfText)
+            print("Content:", content)
+            print("\n")
+
+            message_data = {
+                "index": index,
+                "sender": sender,
+                "date": date,
+                "time": timeOfText,
+                "content": content
+            }
+
+            print(message_data)
+            send_to_websocket(message_data)
 
     time.sleep(4)  # Wait for 4 seconds before checking again
